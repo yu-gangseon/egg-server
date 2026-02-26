@@ -22,7 +22,7 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
 
 /* ========================
-   기본 검증 (서버 시작 시)
+   기본 검증
 ======================== */
 if (!ACP_SECRET || !RPC_URL || !PRIVATE_KEY || !CONTRACT_ADDRESS) {
   console.error("환경변수 누락!");
@@ -30,7 +30,7 @@ if (!ACP_SECRET || !RPC_URL || !PRIVATE_KEY || !CONTRACT_ADDRESS) {
 }
 
 /* ========================
-   IP Rate Limit
+   Rate Limit
 ======================== */
 app.use(rateLimit({
   windowMs: 60 * 1000,
@@ -54,7 +54,7 @@ const contract = new ethers.Contract(
 );
 
 /* ========================
-   메타데이터 CID
+   메타데이터
 ======================== */
 const METADATA = {
   GOLD: "ipfs://bafkreiaglxxl3nrnc4qrsf5qqwwqca2yujl53uk5qgjwgpik6t6ncnxqkm",
@@ -63,7 +63,7 @@ const METADATA = {
 };
 
 /* ========================
-   쿨다운 저장 (메모리)
+   쿨다운 저장
 ======================== */
 const cooldown = new Map();
 
@@ -75,15 +75,18 @@ app.post("/egg", async (req, res) => {
     /* 1. ACP 인증 */
     const apiKey = req.headers["x-acp-key"];
     if (apiKey !== ACP_SECRET) {
-      return res.status(401).json({ success: false, message: "Unauthorized" });
+      return res.json({
+        success: true,
+        output: "Unauthorized request"
+      });
     }
 
-    /* 2. 지갑 검사 */
+    /* 2. 지갑 확인 */
     const wallet = req.body.wallet?.toLowerCase();
     if (!wallet || !ethers.isAddress(wallet)) {
-      return res.status(400).json({
-        success: false,
-        message: "invalid wallet"
+      return res.json({
+        success: true,
+        output: "❌ 유효하지 않은 지갑 주소입니다."
       });
     }
 
@@ -92,8 +95,8 @@ app.post("/egg", async (req, res) => {
     const last = cooldown.get(wallet);
     if (last && now - last < COOLDOWN_TIME) {
       return res.json({
-        success: false,
-        message: "요청이 너무 빠릅니다."
+        success: true,
+        output: "⏳ 잠시 후 다시 시도해주세요."
       });
     }
     cooldown.set(wallet, now);
@@ -102,8 +105,8 @@ app.post("/egg", async (req, res) => {
     const totalSupply = await contract.totalSupply();
     if (totalSupply >= BigInt(MAX_TOTAL_SUPPLY)) {
       return res.json({
-        success: false,
-        message: "에그가 모두 소진되었습니다."
+        success: true,
+        output: "🚫 모든 Mystery Egg가 소진되었습니다."
       });
     }
 
@@ -111,17 +114,17 @@ app.post("/egg", async (req, res) => {
     const balance = await contract.balanceOf(wallet);
     if (balance >= BigInt(MAX_PER_WALLET)) {
       return res.json({
-        success: false,
-        message: "계정당 최대 10개까지만 보유 가능합니다."
+        success: true,
+        output: "🚫 한 계정당 최대 10개의 에그만 보유할 수 있습니다."
       });
     }
 
-    /* 6. 성공 확률 (10%) */
+    /* 6. 성공 확률 */
     if (Math.random() > SUCCESS_RATE) {
       console.log("FAIL:", wallet);
       return res.json({
-        success: false,
-        message: "에그가 깨졌습니다."
+        success: true,
+        output: "❌ 에그가 깨졌습니다. 아무것도 얻지 못했습니다."
       });
     }
 
@@ -149,6 +152,7 @@ app.post("/egg", async (req, res) => {
 
     return res.json({
       success: true,
+      output: `🎉 ${rarity} Mystery Egg를 획득했습니다!\nTX: ${tx.hash}`,
       rarity,
       metadata,
       txHash: tx.hash
@@ -156,9 +160,9 @@ app.post("/egg", async (req, res) => {
 
   } catch (err) {
     console.error("ERROR:", err);
-    return res.status(500).json({
-      success: false,
-      error: err.message
+    return res.json({
+      success: true,
+      output: "⚠️ 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
     });
   }
 });
