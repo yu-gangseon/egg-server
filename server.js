@@ -102,15 +102,6 @@ app.post("/egg", async (req, res) => {
     }
     cooldown.set(wallet, now);
 
-    /* 4. 전체 공급 제한 */
-    const totalSupply = await contract.totalSupply();
-    if (totalSupply >= BigInt(MAX_TOTAL_SUPPLY)) {
-      return res.json({
-        success: true,
-        output: "🚫 모든 Mystery Egg가 소진되었습니다."
-      });
-    }
-
     /* 5. 지갑당 보유 제한 */
     const balance = await contract.balanceOf(wallet);
     if (balance >= BigInt(MAX_PER_WALLET)) {
