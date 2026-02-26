@@ -43,6 +43,8 @@ app.use(rateLimit({
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const signer = new ethers.Wallet(PRIVATE_KEY, provider);
 
+console.log("SERVER WALLET:", signer.address);
+
 /*
 Manifold Creator Core ABI
 - mintBase(address[])
