@@ -10,7 +10,7 @@ app.set("trust proxy", 1);
    경제 설정
 ======================== */
 const MAX_PER_WALLET = 10;
-const SUCCESS_RATE = 0.10;
+const SUCCESS_RATE = 1.0;
 const COOLDOWN_TIME = 30000;
 
 /* ========================
