@@ -48,8 +48,7 @@ const contract = new ethers.Contract(
   CONTRACT_ADDRESS,
   [
     "function mint(address to, string uri)",
-    "function balanceOf(address owner) view returns (uint256)",
-    "function totalSupply() view returns (uint256)"
+    "function balanceOf(address owner) view returns (uint256)"
   ],
   signer
 );
