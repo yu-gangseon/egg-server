@@ -61,7 +61,7 @@ const contract = new ethers.Contract(
 /* ========================
    IPFS 메타데이터
 ======================== */
-const METADATA_URI = "bafkreidrephwz7jgcl6p7vqb54f36ovkhwdwnaof4lhzolooagfv4ju2hy"; // 
+const METADATA_URI = "bafkreicmiz7gz2qpu4c7673dxabbankgvumfwydzwfbbtvk5dzj5ze4eyy"; // 
 
 /* ========================
    쿨다운 저장
