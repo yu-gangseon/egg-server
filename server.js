@@ -46,17 +46,22 @@ const signer = new ethers.Wallet(PRIVATE_KEY, provider);
 console.log("SERVER WALLET:", signer.address);
 
 /*
-Manifold Creator Core ABI
-- mintBase(address[])
+Remix NFT ABI
+mint(address to, string uri)
 */
 const contract = new ethers.Contract(
   CONTRACT_ADDRESS,
   [
-    "function mintBase(address[] calldata receivers) external",
+    "function mint(address to, string uri) external",
     "function balanceOf(address owner) view returns (uint256)"
   ],
   signer
 );
+
+/* ========================
+   IPFS 메타데이터
+======================== */
+const METADATA_URI = "ipfs://bafkreiaucpmqeu6ztdhhm55gnbpdmjejjvmdnoorrl6mts4wzicfmnw4jm"; // 
 
 /* ========================
    쿨다운 저장
@@ -106,7 +111,7 @@ app.post("/egg", async (req, res) => {
       });
     }
 
-    /* 5. 확률 (10%) */
+    /* 5. 확률 */
     if (Math.random() > SUCCESS_RATE) {
       console.log("FAIL:", wallet);
       return res.json({
@@ -115,10 +120,10 @@ app.post("/egg", async (req, res) => {
       });
     }
 
-    /* 6. NFT 민팅 (Manifold 방식) */
+    /* 6. NFT 민팅 (Remix 방식) */
     console.log("MINT:", wallet);
 
-    const tx = await contract.mintBase([wallet]);
+    const tx = await contract.mint(wallet, METADATA_URI);
     await tx.wait();
 
     return res.json({
