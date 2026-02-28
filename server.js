@@ -10,7 +10,7 @@ app.set("trust proxy", 1);
    경제 설정
 ======================== */
 const MAX_PER_WALLET = 10;
-const SUCCESS_RATE = 1.0;
+const SUCCESS_RATE = 0.2; //
 const COOLDOWN_TIME = 30000;
 
 /* ========================
@@ -59,9 +59,13 @@ const contract = new ethers.Contract(
 );
 
 /* ========================
-   IPFS 메타데이터
+   IPFS 메타데이터 (등급별)
 ======================== */
-const METADATA_URI = "ipfs://bafkreid75y3v6w2salzrwnjiuf7e3inyhxhz5jyuv62efvx5ndrljlsoeu"; // 
+const METADATA_URI = {
+  GOLD:   "ipfs://bafkreigotib5iwm4fjj4p4nimnmxml3az7ig3m64o6bktu5ft7nm2f552u",
+  SILVER: "ipfs://bafkreigokenfqdaailgjjxhtbnxvozyqhwj26iqf2or5et2hde55ncgyxi",
+  COMMON: "ipfs://bafkreid75y3v6w2salzrwnjiuf7e3inyhxhz5jyuv62efvx5ndrljlsoeu"
+};
 
 /* ========================
    쿨다운 저장
@@ -111,7 +115,7 @@ app.post("/egg", async (req, res) => {
       });
     }
 
-    /* 5. 확률 */
+    /* 5. 성공 확률 (20%) */
     if (Math.random() > SUCCESS_RATE) {
       console.log("FAIL:", wallet);
       return res.json({
@@ -120,15 +124,33 @@ app.post("/egg", async (req, res) => {
       });
     }
 
-    /* 6. NFT 민팅 (Remix 방식) */
-    console.log("MINT:", wallet);
+    /* 6. 등급 확률 */
+    const roll = Math.random();
+    let rarity;
+    let metadataURI;
 
-    const tx = await contract.mint(wallet, METADATA_URI);
+    if (roll < 0.10) {
+      rarity = "GOLD";
+      metadataURI = METADATA_URI.GOLD;
+    } else if (roll < 0.30) {
+      rarity = "SILVER";
+      metadataURI = METADATA_URI.SILVER;
+    } else {
+      rarity = "COMMON";
+      metadataURI = METADATA_URI.COMMON;
+    }
+
+    console.log("MINT:", wallet, rarity);
+    console.log("URI:", metadataURI);
+
+    /* 7. 민팅 */
+    const tx = await contract.mint(wallet, metadataURI);
     await tx.wait();
 
     return res.json({
       success: true,
-      output: `🎉 Mystery Egg minted!\nTX: ${tx.hash}`,
+      output: `🎉 ${rarity} Mystery Egg minted!\nTX: ${tx.hash}`,
+      rarity,
       txHash: tx.hash
     });
 
