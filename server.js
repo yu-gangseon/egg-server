@@ -12,7 +12,7 @@ app.set("trust proxy", 1);
    경제 설정
 ======================== */
 const MAX_PER_WALLET = 10;
-const SUCCESS_RATE = 0.2; //
+const SUCCESS_RATE = 0.2;
 const COOLDOWN_TIME = 10000;
 
 /* ========================
@@ -47,10 +47,6 @@ const signer = new ethers.Wallet(PRIVATE_KEY, provider);
 
 console.log("SERVER WALLET:", signer.address);
 
-/*
-Remix NFT ABI
-mint(address to, string uri)
-*/
 const contract = new ethers.Contract(
   CONTRACT_ADDRESS,
   [
@@ -61,7 +57,7 @@ const contract = new ethers.Contract(
 );
 
 /* ========================
-   IPFS 메타데이터 (등급별)
+   메타데이터
 ======================== */
 const METADATA_URI = {
   GOLD:   "ipfs://bafkreigotib5iwm4fjj4p4nimnmxml3az7ig3m64o6bktu5ft7nm2f552u",
@@ -70,15 +66,18 @@ const METADATA_URI = {
 };
 
 /* ========================
-   쿨다운 저장
+   쿨다운
 ======================== */
 const cooldown = new Map();
 
 /* ========================
-   메인 API
+   ACP 메인 API
 ======================== */
 app.post("/egg", async (req, res) => {
   try {
+    console.log("=== ACP REQUEST ===");
+    console.log(req.body);
+
     /* 1. ACP 인증 */
     const apiKey = req.headers["x-acp-key"];
     if (apiKey !== ACP_SECRET) {
@@ -88,12 +87,25 @@ app.post("/egg", async (req, res) => {
       });
     }
 
-    /* 2. 지갑 확인 */
-    const wallet = req.body.wallet?.toLowerCase();
+    /* 2. 지갑 파싱 (핵심 수정) */
+    let wallet =
+      req.body.wallet ||
+      req.body.buyerWallet ||
+      req.body.input?.wallet ||
+      req.body.input?.buyerWallet ||
+      req.body.userWallet ||
+      req.body.input?.userWallet;
+
+    if (wallet) {
+      wallet = wallet.toLowerCase();
+    }
+
+    console.log("Parsed wallet:", wallet);
+
     if (!wallet || !ethers.isAddress(wallet)) {
       return res.json({
         success: true,
-        output: "❌ Invalid wallet"
+        output: "❌ Wallet not found from ACP"
       });
     }
 
@@ -108,7 +120,7 @@ app.post("/egg", async (req, res) => {
     }
     cooldown.set(wallet, now);
 
-    /* 4. 지갑당 제한 */
+    /* 4. 보유량 체크 */
     const balance = await contract.balanceOf(wallet);
     if (balance >= BigInt(MAX_PER_WALLET)) {
       return res.json({
@@ -117,7 +129,7 @@ app.post("/egg", async (req, res) => {
       });
     }
 
-    /* 5. 성공 확률 (20%) */
+    /* 5. 성공 확률 */
     if (Math.random() > SUCCESS_RATE) {
       console.log("FAIL:", wallet);
       return res.json({
@@ -126,7 +138,7 @@ app.post("/egg", async (req, res) => {
       });
     }
 
-    /* 6. 등급 확률 */
+    /* 6. 등급 */
     const roll = Math.random();
     let rarity;
     let metadataURI;
@@ -142,8 +154,7 @@ app.post("/egg", async (req, res) => {
       metadataURI = METADATA_URI.COMMON;
     }
 
-    console.log("MINT:", wallet, rarity);
-    console.log("URI:", metadataURI);
+    console.log("MINT TO:", wallet, rarity);
 
     /* 7. 민팅 */
     const tx = await contract.mint(wallet, metadataURI);
@@ -165,7 +176,9 @@ app.post("/egg", async (req, res) => {
   }
 });
 
-
+/* ========================
+   Telegram
+======================== */
 app.post("/telegram", async (req, res) => {
   const message = req.body.message;
 
@@ -185,22 +198,18 @@ app.post("/telegram", async (req, res) => {
   res.sendStatus(200);
 });
 
-
 /* ========================
-   헬스 체크
+   헬스체크
 ======================== */
 app.get("/", (req, res) => {
   res.send("Egg server running");
 });
 
 /* ========================
-   서버 실행
+   서버 시작
 ======================== */
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log("Egg server running on port", PORT);
-
-    // 에이전트도 같이 실행
   startAgent();
 });
-
