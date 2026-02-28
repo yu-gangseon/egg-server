@@ -165,6 +165,14 @@ app.post("/egg", async (req, res) => {
 });
 
 /* ========================
+   Telegram Webhook
+======================== */
+app.post("/telegram", (req, res) => {
+  console.log("Telegram update:", JSON.stringify(req.body, null, 2));
+  res.sendStatus(200);
+});
+
+/* ========================
    헬스 체크
 ======================== */
 app.get("/", (req, res) => {
