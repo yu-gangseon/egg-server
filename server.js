@@ -11,7 +11,7 @@ app.set("trust proxy", 1);
 ======================== */
 const MAX_PER_WALLET = 10;
 const SUCCESS_RATE = 0.2; //
-const COOLDOWN_TIME = 30000;
+const COOLDOWN_TIME = 10000;
 
 /* ========================
    환경변수
