@@ -63,7 +63,7 @@ const contract = new ethers.Contract(
 ======================== */
 const METADATA_URI = {
   GOLD:   "ipfs://bafkreigotib5iwm4fjj4p4nimnmxml3az7ig3m64o6bktu5ft7nm2f552u",
-  SILVER: "ipfs://bafkreigokenfqdaailgjjxhtbnxvozyqhwj26iqf2or5et2hde55ncgyxi",
+  SILVER: "ipfs://bafkreiaeuhso7uh7vaqdwgcorwhnpgx7pnd2qhziamtnrsqyazigwrytgi",
   COMMON: "ipfs://bafkreid75y3v6w2salzrwnjiuf7e3inyhxhz5jyuv62efvx5ndrljlsoeu"
 };
 
