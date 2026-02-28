@@ -1,8 +1,6 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const { ethers } = require("ethers");
-const startAgent = require("./agent");
-const fetch = require("node-fetch");
 
 const app = express();
 app.use(express.json());
@@ -13,7 +11,7 @@ app.set("trust proxy", 1);
 ======================== */
 const MAX_PER_WALLET = 10;
 const SUCCESS_RATE = 0.2;
-const COOLDOWN_TIME = 10000;
+const COOLDOWN_TIME = 30000;
 
 /* ========================
    환경변수
@@ -23,9 +21,6 @@ const RPC_URL = process.env.RPC_URL;
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
 
-/* ========================
-   기본 검증
-======================== */
 if (!ACP_SECRET || !RPC_URL || !PRIVATE_KEY || !CONTRACT_ADDRESS) {
   console.error("환경변수 누락!");
   process.exit(1);
@@ -57,11 +52,11 @@ const contract = new ethers.Contract(
 );
 
 /* ========================
-   메타데이터
+   IPFS 메타데이터
 ======================== */
 const METADATA_URI = {
   GOLD:   "ipfs://bafkreigotib5iwm4fjj4p4nimnmxml3az7ig3m64o6bktu5ft7nm2f552u",
-  SILVER: "ipfs://bafkreiaeuhso7uh7vaqdwgcorwhnpgx7pnd2qhziamtnrsqyazigwrytgi",
+  SILVER: "ipfs://bafkreigokenfqdaailgjjxhtbnxvozyqhwj26iqf2or5et2hde55ncgyxi",
   COMMON: "ipfs://bafkreid75y3v6w2salzrwnjiuf7e3inyhxhz5jyuv62efvx5ndrljlsoeu"
 };
 
@@ -71,13 +66,10 @@ const METADATA_URI = {
 const cooldown = new Map();
 
 /* ========================
-   ACP 메인 API
+   메인 API
 ======================== */
 app.post("/egg", async (req, res) => {
   try {
-    console.log("=== ACP REQUEST ===");
-    console.log(req.body);
-
     /* 1. ACP 인증 */
     const apiKey = req.headers["x-acp-key"];
     if (apiKey !== ACP_SECRET) {
@@ -87,25 +79,20 @@ app.post("/egg", async (req, res) => {
       });
     }
 
-    /* 2. 지갑 파싱 (핵심 수정) */
-    let wallet =
-      req.body.wallet ||
-      req.body.buyerWallet ||
-      req.body.input?.wallet ||
-      req.body.input?.buyerWallet ||
-      req.body.userWallet ||
-      req.body.input?.userWallet;
+    /* 🔥 2. ACP 요청 전체 로그 (중요) */
+    console.log("ACP REQUEST:", req.body);
 
-    if (wallet) {
-      wallet = wallet.toLowerCase();
-    }
+    /* 🔥 wallet / buyerWallet 둘 다 대응 */
+    const wallet =
+      req.body.wallet?.toLowerCase() ||
+      req.body.buyerWallet?.toLowerCase();
 
-    console.log("Parsed wallet:", wallet);
+    console.log("PARSED WALLET:", wallet);
 
     if (!wallet || !ethers.isAddress(wallet)) {
       return res.json({
         success: true,
-        output: "❌ Wallet not found from ACP"
+        output: "❌ Invalid wallet (ACP request empty)"
       });
     }
 
@@ -120,7 +107,7 @@ app.post("/egg", async (req, res) => {
     }
     cooldown.set(wallet, now);
 
-    /* 4. 보유량 체크 */
+    /* 4. 지갑당 제한 */
     const balance = await contract.balanceOf(wallet);
     if (balance >= BigInt(MAX_PER_WALLET)) {
       return res.json({
@@ -138,7 +125,7 @@ app.post("/egg", async (req, res) => {
       });
     }
 
-    /* 6. 등급 */
+    /* 6. 등급 결정 */
     const roll = Math.random();
     let rarity;
     let metadataURI;
@@ -177,39 +164,16 @@ app.post("/egg", async (req, res) => {
 });
 
 /* ========================
-   Telegram
-======================== */
-app.post("/telegram", async (req, res) => {
-  const message = req.body.message;
-
-  if (message) {
-    const chatId = message.chat.id;
-
-    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: "Render에서 실행 중입니다"
-      })
-    });
-  }
-
-  res.sendStatus(200);
-});
-
-/* ========================
-   헬스체크
+   헬스 체크
 ======================== */
 app.get("/", (req, res) => {
   res.send("Egg server running");
 });
 
 /* ========================
-   서버 시작
+   서버 실행
 ======================== */
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log("Egg server running on port", PORT);
-  startAgent();
 });
