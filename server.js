@@ -1,7 +1,6 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const { ethers } = require("ethers");
-const fetch = require("node-fetch");
 const startAgent = require("./agent");
 
 const app = express();
@@ -165,7 +164,6 @@ app.post("/egg", async (req, res) => {
   }
 });
 
-const fetch = require("node-fetch");
 
 app.post("/telegram", async (req, res) => {
   const message = req.body.message;
