@@ -79,13 +79,15 @@ app.post("/egg", async (req, res) => {
       });
     }
 
-    /* 🔥 2. ACP 요청 전체 로그 (중요) */
-    console.log("ACP REQUEST:", req.body);
+    /* 🔥 ACP 요청 전체 확인 */
+    console.log("ACP BODY:", req.body);
 
-    /* 🔥 wallet / buyerWallet 둘 다 대응 */
-    const wallet =
-      req.body.wallet?.toLowerCase() ||
-      req.body.buyerWallet?.toLowerCase();
+    /* 🔥 wallet 위치 전체 대응 (핵심 수정) */
+    const wallet = (
+      req.body.wallet ||
+      req.body.buyerWallet ||
+      req.body.input?.wallet
+    )?.toLowerCase();
 
     console.log("PARSED WALLET:", wallet);
 
@@ -112,13 +114,13 @@ app.post("/egg", async (req, res) => {
     if (balance >= BigInt(MAX_PER_WALLET)) {
       return res.json({
         success: true,
-        output: "🚫 Max 10 NFTs per wallet"
+        output: "🚫 Max NFTs per wallet reached"
       });
     }
 
     /* 5. 성공 확률 */
     if (Math.random() > SUCCESS_RATE) {
-      console.log("FAIL:", wallet);
+      console.log("EGG FAIL:", wallet);
       return res.json({
         success: true,
         output: "❌ Egg failed"
