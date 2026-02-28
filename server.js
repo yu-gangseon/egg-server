@@ -1,6 +1,7 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const { ethers } = require("ethers");
+const startAgent = require("./agent");
 
 const app = express();
 app.use(express.json());
@@ -176,4 +177,8 @@ app.get("/", (req, res) => {
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log("Egg server running on port", PORT);
+
+    // 에이전트도 같이 실행
+  startAgent();
 });
+
