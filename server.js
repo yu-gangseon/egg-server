@@ -165,28 +165,22 @@ app.post("/egg", async (req, res) => {
   }
 });
 
+const fetch = require("node-fetch");
+
 app.post("/telegram", async (req, res) => {
-  console.log("Telegram update:", JSON.stringify(req.body, null, 2));
-
   const message = req.body.message;
-  if (!message) return res.sendStatus(200);
 
-  const chatId = message.chat.id;
-  const text = message.text;
+  if (message) {
+    const chatId = message.chat.id;
 
-  try {
     await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendMessage`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: chatId,
-        text: `끼미: ${text}`
+        text: "Render에서 실행 중입니다"
       })
     });
-  } catch (e) {
-    console.error("Telegram send error:", e);
   }
 
   res.sendStatus(200);
