@@ -1,6 +1,7 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const { ethers } = require("ethers");
+const fetch = require("node-fetch");
 const startAgent = require("./agent");
 
 const app = express();
@@ -164,13 +165,33 @@ app.post("/egg", async (req, res) => {
   }
 });
 
-/* ========================
-   Telegram Webhook
-======================== */
-app.post("/telegram", (req, res) => {
+app.post("/telegram", async (req, res) => {
   console.log("Telegram update:", JSON.stringify(req.body, null, 2));
+
+  const message = req.body.message;
+  if (!message) return res.sendStatus(200);
+
+  const chatId = message.chat.id;
+  const text = message.text;
+
+  try {
+    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: `받았다: ${text}`
+      })
+    });
+  } catch (e) {
+    console.error("Telegram send error:", e);
+  }
+
   res.sendStatus(200);
 });
+
 
 /* ========================
    헬스 체크
