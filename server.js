@@ -2,6 +2,7 @@ const express = require("express");
 const rateLimit = require("express-rate-limit");
 const { ethers } = require("ethers");
 const startAgent = require("./agent");
+const fetch = require("node-fetch");
 
 const app = express();
 app.use(express.json());
