@@ -182,7 +182,7 @@ app.post("/telegram", async (req, res) => {
       },
       body: JSON.stringify({
         chat_id: chatId,
-        text: `받았다: ${text}`
+        text: `끼미: ${text}`
       })
     });
   } catch (e) {
