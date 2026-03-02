@@ -173,51 +173,50 @@ app.post("/agent-revenue", async (req, res) => {
   try {
     const apiKey = req.headers["x-acp-key"];
     if (apiKey !== ACP_SECRET) {
-      return res.json({
-        success: true,
-        output: "Unauthorized"
-      });
+      return res.json({ success: true, output: "Unauthorized" });
     }
 
-    let agentName = req.body.agentName || req.body.input;
-
+    const agentName = (req.body.agentName || req.body.input || "").trim();
     if (!agentName) {
-      return res.json({
-        success: true,
-        output: "Please provide an agent name"
-      });
+      return res.json({ success: true, output: "Please provide an agent name" });
     }
 
-    const searchName = agentName.trim().toLowerCase();
-
-    const url = `https://acpx.virtuals.io/api/agents?sort=successfulJobCount&search=${encodeURIComponent(searchName)}`;
-
-    const response = await axios.get(url);
-    const agents = response.data.data;
-
-    if (!agents || agents.length === 0) {
-      return res.json({
-        success: true,
-        output: "Agent not found"
-      });
-    }
-
-    // 핵심: 공백 제거하고 비교
     const normalize = (str) =>
       str.toLowerCase().replace(/\s+/g, "");
 
-    const target = normalize(searchName);
+    const target = normalize(agentName);
 
-    const agent =
-      agents.find(a =>
-        normalize(a.name).includes(target)
-      ) || agents[0];
+    // 검색 결과 넓게 가져오기
+    const url = `https://acpx.virtuals.io/api/agents?limit=200&search=${encodeURIComponent(agentName)}`;
+    const response = await axios.get(url);
+    const agents = response.data.data || [];
 
-    const m = agent.metrics || {};
+    if (agents.length === 0) {
+      return res.json({ success: true, output: "Agent not found" });
+    }
+
+    let bestMatch = null;
+
+    // 1단계: 완전 일치
+    bestMatch = agents.find(a => normalize(a.name) === target);
+
+    // 2단계: 포함 일치
+    if (!bestMatch) {
+      bestMatch = agents.find(a => normalize(a.name).includes(target));
+    }
+
+    if (!bestMatch) {
+      return res.json({
+        success: true,
+        output: `Agent "${agentName}" not found (no accurate match)`
+      });
+    }
+
+    const m = bestMatch.metrics || {};
 
     return res.json({
       success: true,
-      output: `Agent: ${agent.name}
+      output: `Agent: ${bestMatch.name}
 Revenue: $${(m.revenue || 0).toFixed(2)}
 Jobs: ${m.successfulJobCount || 0}
 Buyers: ${m.uniqueBuyerCount || 0}
