@@ -181,34 +181,47 @@ app.post("/agent-revenue", async (req, res) => {
       return res.json({ success: true, output: "Please provide an agent name" });
     }
 
+    // 문자열 정규화 (공백 제거 + 소문자)
     const normalize = (str) =>
-      str.toLowerCase().replace(/\s+/g, "");
+      (str || "").toLowerCase().replace(/\s+/g, "");
 
     const target = normalize(agentName);
 
-    // 검색 결과 넓게 가져오기
-    const url = `https://acpx.virtuals.io/api/agents?limit=200&search=${encodeURIComponent(agentName)}`;
-    const response = await axios.get(url);
-    const agents = response.data.data || [];
-
-    if (agents.length === 0) {
-      return res.json({ success: true, output: "Agent not found" });
-    }
-
     let bestMatch = null;
 
-    // 1단계: 완전 일치
-    bestMatch = agents.find(a => normalize(a.name) === target);
+    // 🔥 여러 페이지 탐색 (최대 20페이지 = 1000개 검색)
+    for (let page = 1; page <= 20; page++) {
 
-    // 2단계: 포함 일치
-    if (!bestMatch) {
-      bestMatch = agents.find(a => normalize(a.name).includes(target));
+      const url =
+        `https://acpx.virtuals.io/api/agents` +
+        `?search=${encodeURIComponent(agentName)}` +
+        `&pagination[page]=${page}` +
+        `&pagination[pageSize]=50`;
+
+      const response = await axios.get(url);
+      const agents = response.data.data || [];
+
+      if (agents.length === 0) break;
+
+      // 1️⃣ 완전 일치
+      bestMatch = agents.find(a =>
+        normalize(a.name) === target
+      );
+
+      // 2️⃣ 포함 일치
+      if (!bestMatch) {
+        bestMatch = agents.find(a =>
+          normalize(a.name).includes(target)
+        );
+      }
+
+      if (bestMatch) break;
     }
 
     if (!bestMatch) {
       return res.json({
         success: true,
-        output: `Agent "${agentName}" not found (no accurate match)`
+        output: `Agent "${agentName}" not found`
       });
     }
 
@@ -217,7 +230,7 @@ app.post("/agent-revenue", async (req, res) => {
     return res.json({
       success: true,
       output: `Agent: ${bestMatch.name}
-Revenue: $${(m.revenue || 0).toFixed(2)}
+Revenue: $${Number(m.revenue || 0).toFixed(2)}
 Jobs: ${m.successfulJobCount || 0}
 Buyers: ${m.uniqueBuyerCount || 0}
 Success Rate: ${m.successRate || 0}%`
@@ -231,7 +244,6 @@ Success Rate: ${m.successRate || 0}%`
     });
   }
 });
-
 
 
 /* ========================
