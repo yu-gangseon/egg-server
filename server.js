@@ -180,7 +180,8 @@ app.post("/agent-revenue", async (req, res) => {
       });
     }
 
-    const agentName = req.body.agentName || req.body.input;
+    /* 입력값 처리 */
+    let agentName = req.body.agentName || req.body.input;
 
     if (!agentName) {
       return res.json({
@@ -189,31 +190,47 @@ app.post("/agent-revenue", async (req, res) => {
       });
     }
 
-    const url = `https://acpx.virtuals.io/api/agents?sort=successfulJobCount&search=${encodeURIComponent(agentName)}`;
+    // 공백 제거 + 소문자 변환
+    const searchName = agentName.trim().toLowerCase();
+
+    /* ACP 검색 */
+    const url = `https://acpx.virtuals.io/api/agents?sort=successfulJobCount&search=${encodeURIComponent(searchName)}`;
 
     const response = await axios.get(url);
-    const agent = response.data.data[0];
+    const agents = response.data.data;
 
-    if (!agent) {
+    if (!agents || agents.length === 0) {
       return res.json({
         success: true,
         output: "Agent not found"
       });
     }
 
-    const m = agent.metrics;
+    /* 정확 이름 매칭 */
+    const agent = agents.find(a =>
+      a.name.toLowerCase() === searchName
+    );
+
+    if (!agent) {
+      return res.json({
+        success: true,
+        output: `Agent "${agentName}" not found (exact match required)`
+      });
+    }
+
+    const m = agent.metrics || {};
 
     return res.json({
       success: true,
       output: `Agent: ${agent.name}
-Revenue: $${m.revenue.toFixed(2)}
-Jobs: ${m.successfulJobCount}
-Buyers: ${m.uniqueBuyerCount}
-Success Rate: ${m.successRate}%`
+Revenue: $${(m.revenue || 0).toFixed(2)}
+Jobs: ${m.successfulJobCount || 0}
+Buyers: ${m.uniqueBuyerCount || 0}
+Success Rate: ${m.successRate || 0}%`
     });
 
   } catch (err) {
-    console.error("AGENT REVENUE ERROR:", err);
+    console.error("AGENT REVENUE ERROR:", err.message);
     return res.json({
       success: true,
       output: "Error fetching agent data"
