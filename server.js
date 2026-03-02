@@ -67,9 +67,10 @@ const METADATA_URI = {
 const cooldown = new Map();
 
 /* ========================
-   Agent Cache (추가)
+   Agent Revenue Cache (30초)
 ======================== */
-const agentMap = new Map();
+const revenueCache = new Map();
+const CACHE_TIME = 30000;
 
 /* ========================
    메인 API
@@ -172,7 +173,7 @@ app.post("/egg", async (req, res) => {
 });
 
 /* ========================
-   Offer 3 : Agent Revenue (안정버전)
+   Offer : Agent Revenue (FINAL)
 ======================== */
 app.post("/agent-revenue", async (req, res) => {
   try {
@@ -191,54 +192,113 @@ app.post("/agent-revenue", async (req, res) => {
 
     const target = normalize(agentName);
 
-    let agentId = agentMap.get(target);
-
-    /* 캐시에 없으면 전체 탐색 */
-    if (!agentId) {
-      for (let page = 1; page <= 50; page++) {
-
-        const url =
-          `https://acpx.virtuals.io/api/agents` +
-          `?pagination[page]=${page}` +
-          `&pagination[pageSize]=50`;
-
-        const response = await axios.get(url);
-        const agents = response.data.data || [];
-
-        if (agents.length === 0) break;
-
-        const found = agents.find(a =>
-          normalize(a.name) === target
-        );
-
-        if (found) {
-          agentId = found.id;
-          agentMap.set(target, agentId);
-          break;
-        }
-      }
+    /* ===== 캐시 확인 ===== */
+    const cached = revenueCache.get(target);
+    if (cached && Date.now() - cached.time < CACHE_TIME) {
+      return res.json({
+        success: true,
+        output: cached.output
+      });
     }
 
-    if (!agentId) {
+    /* ===== 검색 API ===== */
+    const url =
+      `https://acpx.virtuals.io/api/agents` +
+      `?filters[hasGraduated]=all` +
+      `&sort=successfulJobCount` +
+      `&search=${encodeURIComponent(agentName)}` +
+      `&pagination[page]=1` +
+      `&pagination[pageSize]=50`;
+
+    const response = await axios.get(url, { timeout: 5000 });
+    const agents = response.data.data || [];
+
+    if (agents.length === 0) {
       return res.json({
         success: true,
         output: `Agent "${agentName}" not found`
       });
     }
 
-    /* 상세 조회 */
-    const detailUrl = `https://acpx.virtuals.io/api/agents/${agentId}/details`;
-    const detailRes = await axios.get(detailUrl);
-    const agent = detailRes.data;
+    let agent = null;
+
+    /* 1. 정확 일치 */
+    const exact = agents.filter(a => normalize(a.name) === target);
+    if (exact.length === 1) agent = exact[0];
+
+    if (!agent && exact.length > 1) {
+      return res.json({
+        success: true,
+        output:
+          `Multiple agents found:\n` +
+          exact.map(a => `- ${a.name} (ID: ${a.id})`).join("\n") +
+          `\n\nPlease enter full name.`
+      });
+    }
+
+    /* 2. startsWith */
+    if (!agent) {
+      const starts = agents.filter(a =>
+        normalize(a.name).startsWith(target)
+      );
+
+      if (starts.length === 1) agent = starts[0];
+
+      if (starts.length > 1) {
+        return res.json({
+          success: true,
+          output:
+            `Multiple agents found:\n` +
+            starts.map(a => `- ${a.name} (ID: ${a.id})`).join("\n") +
+            `\n\nPlease enter full name.`
+        });
+      }
+    }
+
+    /* 3. includes */
+    if (!agent) {
+      const includes = agents.filter(a =>
+        normalize(a.name).includes(target)
+      );
+
+      if (includes.length === 1) agent = includes[0];
+
+      if (includes.length > 1) {
+        return res.json({
+          success: true,
+          output:
+            `Multiple agents found:\n` +
+            includes.map(a => `- ${a.name} (ID: ${a.id})`).join("\n") +
+            `\n\nPlease enter full name.`
+        });
+      }
+    }
+
+    if (!agent) {
+      return res.json({
+        success: true,
+        output: `Agent "${agentName}" not found`
+      });
+    }
+
     const m = agent.metrics || {};
 
-    return res.json({
-      success: true,
-      output: `Agent: ${agent.name}
+    const result = `Agent: ${agent.name}
+ID: ${agent.id}
 Revenue: $${Number(m.revenue || 0).toFixed(2)}
 Jobs: ${m.successfulJobCount || 0}
 Buyers: ${m.uniqueBuyerCount || 0}
-Success Rate: ${m.successRate || 0}%`
+Success Rate: ${m.successRate || 0}%`;
+
+    /* 캐시 저장 */
+    revenueCache.set(target, {
+      time: Date.now(),
+      output: result
+    });
+
+    return res.json({
+      success: true,
+      output: result
     });
 
   } catch (err) {
@@ -249,6 +309,7 @@ Success Rate: ${m.successRate || 0}%`
     });
   }
 });
+
 
 
 /* ========================
