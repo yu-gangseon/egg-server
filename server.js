@@ -67,6 +67,11 @@ const METADATA_URI = {
 const cooldown = new Map();
 
 /* ========================
+   Agent Cache (추가)
+======================== */
+const agentMap = new Map();
+
+/* ========================
    메인 API
 ======================== */
 app.post("/egg", async (req, res) => {
@@ -167,7 +172,7 @@ app.post("/egg", async (req, res) => {
 });
 
 /* ========================
-   Offer 3 : Agent Revenue
+   Offer 3 : Agent Revenue (안정버전)
 ======================== */
 app.post("/agent-revenue", async (req, res) => {
   try {
@@ -178,58 +183,58 @@ app.post("/agent-revenue", async (req, res) => {
 
     const agentName = (req.body.agentName || req.body.input || "").trim();
     if (!agentName) {
-      return res.json({ success: true, output: "Please provide an agent name" });
+      return res.json({ success: true, output: "Enter agent name" });
     }
 
-    // 문자열 정규화 (공백 제거 + 소문자)
     const normalize = (str) =>
       (str || "").toLowerCase().replace(/\s+/g, "");
 
     const target = normalize(agentName);
 
-    let bestMatch = null;
+    let agentId = agentMap.get(target);
 
-    // 🔥 여러 페이지 탐색 (최대 20페이지 = 1000개 검색)
-    for (let page = 1; page <= 20; page++) {
+    /* 캐시에 없으면 전체 탐색 */
+    if (!agentId) {
+      for (let page = 1; page <= 50; page++) {
 
-      const url =
-        `https://acpx.virtuals.io/api/agents` +
-        `?search=${encodeURIComponent(agentName)}` +
-        `&pagination[page]=${page}` +
-        `&pagination[pageSize]=50`;
+        const url =
+          `https://acpx.virtuals.io/api/agents` +
+          `?pagination[page]=${page}` +
+          `&pagination[pageSize]=50`;
 
-      const response = await axios.get(url);
-      const agents = response.data.data || [];
+        const response = await axios.get(url);
+        const agents = response.data.data || [];
 
-      if (agents.length === 0) break;
+        if (agents.length === 0) break;
 
-      // 1️⃣ 완전 일치
-      bestMatch = agents.find(a =>
-        normalize(a.name) === target
-      );
-
-      // 2️⃣ 포함 일치
-      if (!bestMatch) {
-        bestMatch = agents.find(a =>
-          normalize(a.name).includes(target)
+        const found = agents.find(a =>
+          normalize(a.name) === target
         );
-      }
 
-      if (bestMatch) break;
+        if (found) {
+          agentId = found.id;
+          agentMap.set(target, agentId);
+          break;
+        }
+      }
     }
 
-    if (!bestMatch) {
+    if (!agentId) {
       return res.json({
         success: true,
         output: `Agent "${agentName}" not found`
       });
     }
 
-    const m = bestMatch.metrics || {};
+    /* 상세 조회 */
+    const detailUrl = `https://acpx.virtuals.io/api/agents/${agentId}/details`;
+    const detailRes = await axios.get(detailUrl);
+    const agent = detailRes.data;
+    const m = agent.metrics || {};
 
     return res.json({
       success: true,
-      output: `Agent: ${bestMatch.name}
+      output: `Agent: ${agent.name}
 Revenue: $${Number(m.revenue || 0).toFixed(2)}
 Jobs: ${m.successfulJobCount || 0}
 Buyers: ${m.uniqueBuyerCount || 0}
