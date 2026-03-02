@@ -171,7 +171,6 @@ app.post("/egg", async (req, res) => {
 ======================== */
 app.post("/agent-revenue", async (req, res) => {
   try {
-    /* ACP 인증 */
     const apiKey = req.headers["x-acp-key"];
     if (apiKey !== ACP_SECRET) {
       return res.json({
@@ -180,7 +179,6 @@ app.post("/agent-revenue", async (req, res) => {
       });
     }
 
-    /* 입력값 처리 */
     let agentName = req.body.agentName || req.body.input;
 
     if (!agentName) {
@@ -190,10 +188,8 @@ app.post("/agent-revenue", async (req, res) => {
       });
     }
 
-    // 공백 제거 + 소문자 변환
     const searchName = agentName.trim().toLowerCase();
 
-    /* ACP 검색 */
     const url = `https://acpx.virtuals.io/api/agents?sort=successfulJobCount&search=${encodeURIComponent(searchName)}`;
 
     const response = await axios.get(url);
@@ -206,17 +202,16 @@ app.post("/agent-revenue", async (req, res) => {
       });
     }
 
-    /* 정확 이름 매칭 */
-    const agent = agents.find(a =>
-      a.name.toLowerCase() === searchName
-    );
+    // 핵심: 공백 제거하고 비교
+    const normalize = (str) =>
+      str.toLowerCase().replace(/\s+/g, "");
 
-    if (!agent) {
-      return res.json({
-        success: true,
-        output: `Agent "${agentName}" not found (exact match required)`
-      });
-    }
+    const target = normalize(searchName);
+
+    const agent =
+      agents.find(a =>
+        normalize(a.name).includes(target)
+      ) || agents[0];
 
     const m = agent.metrics || {};
 
@@ -237,6 +232,8 @@ Success Rate: ${m.successRate || 0}%`
     });
   }
 });
+
+
 
 /* ========================
    헬스 체크
