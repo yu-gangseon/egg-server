@@ -173,7 +173,7 @@ app.post("/egg", async (req, res) => {
 });
 
 /* ========================
-   Offer : Agent Revenue (FINAL COMPLETE)
+   Offer : Agent Revenue (FINAL STABLE)
 ======================== */
 app.post("/agent-revenue", async (req, res) => {
   try {
@@ -192,7 +192,7 @@ app.post("/agent-revenue", async (req, res) => {
 
     const target = normalize(input);
 
-    /* ===== 캐시 확인 ===== */
+    /* 캐시 확인 */
     const cached = revenueCache.get(target);
     if (cached && Date.now() - cached.time < CACHE_TIME) {
       return res.json({
@@ -204,16 +204,13 @@ app.post("/agent-revenue", async (req, res) => {
     let agent = null;
     let metrics = null;
 
-    /* =======================================================
-       1️⃣ 숫자 입력 → ID 직접 조회
-    ======================================================= */
+    /* 1️⃣ 숫자면 ID 조회 */
     if (/^\d+$/.test(input)) {
       try {
         const url = `https://acpx.virtuals.io/api/agents/${input}/details`;
         const response = await axios.get(url, { timeout: 5000 });
 
         const data = response.data.data || response.data;
-
         if (!data) {
           return res.json({
             success: true,
@@ -223,7 +220,7 @@ app.post("/agent-revenue", async (req, res) => {
 
         agent = data;
         metrics = data.metrics || {};
-      } catch (e) {
+      } catch {
         return res.json({
           success: true,
           output: `Agent ID ${input} not found`
@@ -231,9 +228,7 @@ app.post("/agent-revenue", async (req, res) => {
       }
     }
 
-    /* =======================================================
-       2️⃣ 이름 검색
-    ======================================================= */
+    /* 2️⃣ 이름 검색 */
     if (!agent) {
       const searchUrl =
         `https://acpx.virtuals.io/api/agents` +
@@ -253,11 +248,7 @@ app.post("/agent-revenue", async (req, res) => {
         });
       }
 
-      /* 정확 일치 */
-      const exact = agents.filter(a =>
-        normalize(a.name) === target
-      );
-
+      const exact = agents.filter(a => normalize(a.name) === target);
       if (exact.length === 1) agent = exact[0];
 
       if (!agent && exact.length > 1) {
@@ -266,11 +257,10 @@ app.post("/agent-revenue", async (req, res) => {
           output:
             `Multiple agents found:\n` +
             exact.map(a => `- ${a.name} (ID: ${a.id})`).join("\n") +
-            `\n\nPlease enter full name or ID.`
+            `\n\nEnter full name or ID.`
         });
       }
 
-      /* startsWith */
       if (!agent) {
         const starts = agents.filter(a =>
           normalize(a.name).startsWith(target)
@@ -284,12 +274,11 @@ app.post("/agent-revenue", async (req, res) => {
             output:
               `Multiple agents found:\n` +
               starts.map(a => `- ${a.name} (ID: ${a.id})`).join("\n") +
-              `\n\nPlease enter full name or ID.`
+              `\n\nEnter full name or ID.`
           });
         }
       }
 
-      /* includes */
       if (!agent) {
         const includes = agents.filter(a =>
           normalize(a.name).includes(target)
@@ -303,7 +292,7 @@ app.post("/agent-revenue", async (req, res) => {
             output:
               `Multiple agents found:\n` +
               includes.map(a => `- ${a.name} (ID: ${a.id})`).join("\n") +
-              `\n\nPlease enter full name or ID.`
+              `\n\nEnter full name or ID.`
           });
         }
       }
@@ -318,9 +307,7 @@ app.post("/agent-revenue", async (req, res) => {
       metrics = agent.metrics || {};
     }
 
-    /* =======================================================
-       3️⃣ 결과
-    ======================================================= */
+    /* 결과 */
     const result = `Agent: ${agent.name}
 ID: ${agent.id}
 Revenue: $${Number(metrics.revenue || 0).toFixed(2)}
@@ -333,6 +320,11 @@ Success Rate: ${metrics.successRate || 0}%`;
       time: Date.now(),
       output: result
     });
+
+    /* 캐시 메모리 보호 */
+    if (revenueCache.size > 1000) {
+      revenueCache.clear();
+    }
 
     return res.json({
       success: true,
@@ -347,7 +339,6 @@ Success Rate: ${metrics.successRate || 0}%`;
     });
   }
 });
-
 
 /* ========================
    헬스 체크
