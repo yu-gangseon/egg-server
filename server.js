@@ -173,7 +173,7 @@ app.post("/egg", async (req, res) => {
 });
 
 /* ========================
-   Offer : Agent Revenue (FINAL)
+   Offer : Agent Revenue (FINAL COMPLETE)
 ======================== */
 app.post("/agent-revenue", async (req, res) => {
   try {
@@ -182,15 +182,15 @@ app.post("/agent-revenue", async (req, res) => {
       return res.json({ success: true, output: "Unauthorized" });
     }
 
-    const agentName = (req.body.agentName || req.body.input || "").trim();
-    if (!agentName) {
-      return res.json({ success: true, output: "Enter agent name" });
+    const input = (req.body.agentName || req.body.input || "").trim();
+    if (!input) {
+      return res.json({ success: true, output: "Enter agent name or ID" });
     }
 
     const normalize = (str) =>
       (str || "").toLowerCase().replace(/\s+/g, "");
 
-    const target = normalize(agentName);
+    const target = normalize(input);
 
     /* ===== 캐시 확인 ===== */
     const cached = revenueCache.get(target);
@@ -201,94 +201,132 @@ app.post("/agent-revenue", async (req, res) => {
       });
     }
 
-    /* ===== 검색 API ===== */
-    const url =
-      `https://acpx.virtuals.io/api/agents` +
-      `?filters[hasGraduated]=all` +
-      `&sort=successfulJobCount` +
-      `&search=${encodeURIComponent(agentName)}` +
-      `&pagination[page]=1` +
-      `&pagination[pageSize]=50`;
-
-    const response = await axios.get(url, { timeout: 5000 });
-    const agents = response.data.data || [];
-
-    if (agents.length === 0) {
-      return res.json({
-        success: true,
-        output: `Agent "${agentName}" not found`
-      });
-    }
-
     let agent = null;
+    let metrics = null;
 
-    /* 1. 정확 일치 */
-    const exact = agents.filter(a => normalize(a.name) === target);
-    if (exact.length === 1) agent = exact[0];
+    /* =======================================================
+       1️⃣ 숫자 입력 → ID 직접 조회
+    ======================================================= */
+    if (/^\d+$/.test(input)) {
+      try {
+        const url = `https://acpx.virtuals.io/api/agents/${input}/details`;
+        const response = await axios.get(url, { timeout: 5000 });
 
-    if (!agent && exact.length > 1) {
-      return res.json({
-        success: true,
-        output:
-          `Multiple agents found:\n` +
-          exact.map(a => `- ${a.name} (ID: ${a.id})`).join("\n") +
-          `\n\nPlease enter full name.`
-      });
-    }
+        const data = response.data.data || response.data;
 
-    /* 2. startsWith */
-    if (!agent) {
-      const starts = agents.filter(a =>
-        normalize(a.name).startsWith(target)
-      );
+        if (!data) {
+          return res.json({
+            success: true,
+            output: `Agent ID ${input} not found`
+          });
+        }
 
-      if (starts.length === 1) agent = starts[0];
-
-      if (starts.length > 1) {
+        agent = data;
+        metrics = data.metrics || {};
+      } catch (e) {
         return res.json({
           success: true,
-          output:
-            `Multiple agents found:\n` +
-            starts.map(a => `- ${a.name} (ID: ${a.id})`).join("\n") +
-            `\n\nPlease enter full name.`
+          output: `Agent ID ${input} not found`
         });
       }
     }
 
-    /* 3. includes */
+    /* =======================================================
+       2️⃣ 이름 검색
+    ======================================================= */
     if (!agent) {
-      const includes = agents.filter(a =>
-        normalize(a.name).includes(target)
+      const searchUrl =
+        `https://acpx.virtuals.io/api/agents` +
+        `?filters[hasGraduated]=all` +
+        `&sort=successfulJobCount` +
+        `&search=${encodeURIComponent(input)}` +
+        `&pagination[page]=1` +
+        `&pagination[pageSize]=50`;
+
+      const response = await axios.get(searchUrl, { timeout: 5000 });
+      const agents = response.data.data || [];
+
+      if (agents.length === 0) {
+        return res.json({
+          success: true,
+          output: `Agent "${input}" not found`
+        });
+      }
+
+      /* 정확 일치 */
+      const exact = agents.filter(a =>
+        normalize(a.name) === target
       );
 
-      if (includes.length === 1) agent = includes[0];
+      if (exact.length === 1) agent = exact[0];
 
-      if (includes.length > 1) {
+      if (!agent && exact.length > 1) {
         return res.json({
           success: true,
           output:
             `Multiple agents found:\n` +
-            includes.map(a => `- ${a.name} (ID: ${a.id})`).join("\n") +
-            `\n\nPlease enter full name.`
+            exact.map(a => `- ${a.name} (ID: ${a.id})`).join("\n") +
+            `\n\nPlease enter full name or ID.`
         });
       }
+
+      /* startsWith */
+      if (!agent) {
+        const starts = agents.filter(a =>
+          normalize(a.name).startsWith(target)
+        );
+
+        if (starts.length === 1) agent = starts[0];
+
+        if (starts.length > 1) {
+          return res.json({
+            success: true,
+            output:
+              `Multiple agents found:\n` +
+              starts.map(a => `- ${a.name} (ID: ${a.id})`).join("\n") +
+              `\n\nPlease enter full name or ID.`
+          });
+        }
+      }
+
+      /* includes */
+      if (!agent) {
+        const includes = agents.filter(a =>
+          normalize(a.name).includes(target)
+        );
+
+        if (includes.length === 1) agent = includes[0];
+
+        if (includes.length > 1) {
+          return res.json({
+            success: true,
+            output:
+              `Multiple agents found:\n` +
+              includes.map(a => `- ${a.name} (ID: ${a.id})`).join("\n") +
+              `\n\nPlease enter full name or ID.`
+          });
+        }
+      }
+
+      if (!agent) {
+        return res.json({
+          success: true,
+          output: `Agent "${input}" not found`
+        });
+      }
+
+      metrics = agent.metrics || {};
     }
 
-    if (!agent) {
-      return res.json({
-        success: true,
-        output: `Agent "${agentName}" not found`
-      });
-    }
-
-    const m = agent.metrics || {};
-
+    /* =======================================================
+       3️⃣ 결과
+    ======================================================= */
     const result = `Agent: ${agent.name}
 ID: ${agent.id}
-Revenue: $${Number(m.revenue || 0).toFixed(2)}
-Jobs: ${m.successfulJobCount || 0}
-Buyers: ${m.uniqueBuyerCount || 0}
-Success Rate: ${m.successRate || 0}%`;
+Revenue: $${Number(metrics.revenue || 0).toFixed(2)}
+Jobs: ${metrics.successfulJobCount || 0}
+Buyers: ${metrics.uniqueBuyerCount || 0}
+Success Rate: ${metrics.successRate || 0}%`;
 
     /* 캐시 저장 */
     revenueCache.set(target, {
@@ -309,7 +347,6 @@ Success Rate: ${m.successRate || 0}%`;
     });
   }
 });
-
 
 
 /* ========================
