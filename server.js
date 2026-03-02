@@ -1,6 +1,7 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const { ethers } = require("ethers");
+const axios = require("axios");
 
 const app = express();
 app.use(express.json());
@@ -161,6 +162,61 @@ app.post("/egg", async (req, res) => {
     return res.json({
       success: true,
       output: "⚠️ Server error"
+    });
+  }
+});
+
+/* ========================
+   Offer 3 : Agent Revenue
+======================== */
+app.post("/agent-revenue", async (req, res) => {
+  try {
+    /* ACP 인증 */
+    const apiKey = req.headers["x-acp-key"];
+    if (apiKey !== ACP_SECRET) {
+      return res.json({
+        success: true,
+        output: "Unauthorized"
+      });
+    }
+
+    const agentName = req.body.agentName || req.body.input;
+
+    if (!agentName) {
+      return res.json({
+        success: true,
+        output: "Please provide an agent name"
+      });
+    }
+
+    const url = `https://acpx.virtuals.io/api/agents?sort=successfulJobCount&search=${encodeURIComponent(agentName)}`;
+
+    const response = await axios.get(url);
+    const agent = response.data.data[0];
+
+    if (!agent) {
+      return res.json({
+        success: true,
+        output: "Agent not found"
+      });
+    }
+
+    const m = agent.metrics;
+
+    return res.json({
+      success: true,
+      output: `Agent: ${agent.name}
+Revenue: $${m.revenue.toFixed(2)}
+Jobs: ${m.successfulJobCount}
+Buyers: ${m.uniqueBuyerCount}
+Success Rate: ${m.successRate}%`
+    });
+
+  } catch (err) {
+    console.error("AGENT REVENUE ERROR:", err);
+    return res.json({
+      success: true,
+      output: "Error fetching agent data"
     });
   }
 });
